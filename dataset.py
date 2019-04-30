@@ -111,8 +111,6 @@ class PAC20192D(Dataset):
         for i, data in enumerate(self.dataset):
             if i % 50 == 0:
                 print('Loading %d/%d' % (i, len(self.dataset)))
-                if i == 50:
-                    break
             filename = os.path.join(self.ctx["dataset_path"], 'gm', data['subject'] + '_gm.nii.gz')
             input_image = torch.FloatTensor(nib.load(filename).get_fdata())
             input_image = input_image.permute(2, 0, 1)
