@@ -1,7 +1,7 @@
 import json
 
-from dataset import PAC2019
-from model import Model, VGGBasedModel
+from dataset import PAC2019, PAC20192D
+from model import Model, VGGBasedModel, VGGBasedModel2D
 
 import torch
 from torch.autograd import Variable
@@ -10,10 +10,28 @@ from torch.utils.data import DataLoader
 import numpy as np
 
 
+# def cosine_rampdown(current, rampdown_length):
+#     """Cosine rampdown from https://arxiv.org/abs/1608.03983"""
+#     assert 0 <= current <= rampdown_length
+#     return float(.5 * (np.cos(np.pi * current / rampdown_length) + 1))
+#
+# def sigmoid_rampup(current, rampup_length):
+#     if rampup_length == 0:
+#         return 1.0
+#     else:
+#         current = np.clip(current, 0.0, rampup_length)
+#         phase = 1.0 - current / rampup_length
+#         return float(np.exp(-5.0 * phase * phase))
+
+
 with open("config.json") as fid:
     ctx = json.load(fid)
-train_set = PAC2019(ctx, set='train')
-val_set = PAC2019(ctx, set='val')
+
+# train_set = PAC2019(ctx, set='train')
+# val_set = PAC2019(ctx, set='val')
+train_set = PAC20192D(ctx, set='train', split=0.8)
+val_set = PAC20192D(ctx, set='val', split=0.8)
+
 train_loader = DataLoader(train_set, shuffle=True, drop_last=True,
                              num_workers=8, batch_size=ctx["batch_size"])
 val_loader = DataLoader(val_set, shuffle=False, drop_last=False,
@@ -21,13 +39,15 @@ val_loader = DataLoader(val_set, shuffle=False, drop_last=False,
 
 mse_loss = nn.MSELoss()
 # model = Model()
-model = VGGBasedModel()
+# model = VGGBasedModel()
+model = VGGBasedModel2D()
 model.cuda()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=ctx["learning_rate"],
                              weight_decay=ctx["weight_decay"])
-
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3,5,10], gamma=0.1)
 for e in range(ctx["epochs"]):
+    scheduler.step()
     model.train()
     last_50 = []
     for i, data in enumerate(train_loader):
