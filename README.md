@@ -6,6 +6,6 @@ Training Code for PAC 2019
 
 | Method               | MSE/MAE (Years)|
 |:---------------------|----------------|
-| 2D CNN               |                |
+| 2D CNN               |  6.18  (MAE)   |
 | 3D CNN (Cole et al.) |  18.46 (MAE)   |
 | 2D CNN (slices)      |  7.06  (MAE)   |
