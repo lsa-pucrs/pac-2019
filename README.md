@@ -8,4 +8,4 @@ Training Code for PAC 2019
 |:---------------------|----------------|
 | 2D CNN               |                |
 | 3D CNN (Cole et al.) |  18.46 (MAE)   |
-| 2D CNN (slices)      |                |
+| 2D CNN (slices)      |  7.06  (MAE)   |
