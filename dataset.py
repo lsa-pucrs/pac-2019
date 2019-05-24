@@ -90,7 +90,7 @@ class PAC2019(Dataset):
 
 
 class PAC20192D(Dataset):
-    def __init__(self, ctx, set, split=0.7, portion=0.7):
+    def __init__(self, ctx, set, split=0.7, portion=0.8):
         """
         split: train/val split
         portion: portion of the axial slices that enter the dataset

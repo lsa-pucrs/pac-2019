@@ -1,6 +1,6 @@
 {
   "dataset_path": "/A/ballester/PAC2019_DATA",
-  "batch_size": 16,
+  "batch_size": 32,
   "learning_rate": 0.001,
   "weight_decay": 0.0006,
   "epochs": 15

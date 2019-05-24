@@ -46,6 +46,7 @@ model.cuda()
 optimizer = torch.optim.Adam(model.parameters(), lr=ctx["learning_rate"],
                              weight_decay=ctx["weight_decay"])
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3,5,10], gamma=0.1)
+best = np.inf
 for e in range(ctx["epochs"]):
     scheduler.step()
     model.train()
@@ -68,7 +69,6 @@ for e in range(ctx["epochs"]):
             print('Training Loss: ', np.mean(last_50))
             last_50 = []
 
-
     print('Validation...')
     model.eval()
     val_mse_loss = []
@@ -83,6 +83,11 @@ for e in range(ctx["epochs"]):
 
         loss = torch.mean(torch.abs(output.squeeze() - label))
         val_mae_loss.append(loss.data)
+
+    if np.mean(val_mae_loss) < best:
+        best = np.mean(val_mae_loss)
+        print('model saved')
+        torch.save(model.state_dict(), 'models/best_model.pt')
 
     print('Validation Loss (MSE): ', np.mean(val_mse_loss))
     print('Validation Loss (MAE): ', np.mean(val_mae_loss))
