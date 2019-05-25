@@ -2,6 +2,7 @@ import json
 
 from dataset import PAC2019, PAC20192D
 from model import Model, VGGBasedModel, VGGBasedModel2D
+from model_resnet import ResNet, resnet18
 
 import torch
 from torch.autograd import Variable
@@ -40,7 +41,8 @@ val_loader = DataLoader(val_set, shuffle=False, drop_last=False,
 mse_loss = nn.MSELoss()
 # model = Model()
 # model = VGGBasedModel()
-model = VGGBasedModel2D()
+# model = VGGBasedModel2D()
+model = resnet18()
 model.cuda()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=ctx["learning_rate"],
@@ -66,7 +68,7 @@ for e in range(ctx["epochs"]):
 
         last_50.append(loss.data)
         if (i+1) % 50 == 0:
-            print('Training Loss: ', np.mean(last_50))
+            print('Training Loss: ', torch.mean(torch.stack(last_50)))
             last_50 = []
 
     print('Validation...')
@@ -84,10 +86,11 @@ for e in range(ctx["epochs"]):
         loss = torch.mean(torch.abs(output.squeeze() - label))
         val_mae_loss.append(loss.data)
 
-    if np.mean(val_mae_loss) < best:
-        best = np.mean(val_mae_loss)
+    if torch.mean(torch.stack(val_mae_loss)) < best:
+        best = torch.mean(torch.stack(val_mae_loss))
         print('model saved')
         torch.save(model.state_dict(), 'models/best_model.pt')
 
-    print('Validation Loss (MSE): ', np.mean(val_mse_loss))
-    print('Validation Loss (MAE): ', np.mean(val_mae_loss))
+    print('Validation Loss (MSE): ', torch.mean(torch.stack(val_mse_loss)))
+    print('Validation Loss (MAE): ', torch.mean(torch.stack(val_mae_loss)))
+
