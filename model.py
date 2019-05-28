@@ -187,3 +187,66 @@ class VGGBasedModel2D(nn.Module):
         # print(x.shape)
 
         return x
+
+class ColeModel(nn.Module):
+    def __init__(self):
+        super(ColeModel, self).__init__()
+        self.block1 = nn.Sequential(
+            nn.Conv3d(1, 8, 3, stride=1),
+            nn.ReLU(),
+            nn.Conv3d(8, 8, 3, stride=1),
+            nn.BatchNorm3d(8),
+            nn.ReLU(),
+            nn.MaxPool3d(2, stride=2))
+
+        self.block2 = nn.Sequential(
+            nn.Conv3d(8, 16, 3, stride=1),
+            nn.ReLU(),
+            nn.Conv3d(16, 16, 3, stride=1),
+            nn.BatchNorm3d(16),
+            nn.ReLU(),
+            nn.MaxPool3d(2, stride=2))
+
+        self.block3 = nn.Sequential(
+            nn.Conv3d(16, 32, 3, stride=1),
+            nn.ReLU(),
+            nn.Conv3d(32, 32, 3, stride=1),
+            nn.BatchNorm3d(32),
+            nn.ReLU(),
+            nn.MaxPool3d(2, stride=2))
+
+        self.block4 = nn.Sequential(
+            nn.Conv3d(32, 64, 3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(64, 64, 3, stride=1, padding=1),
+            nn.BatchNorm3d(64),
+            nn.ReLU(),
+            nn.MaxPool3d(2, stride=2))
+
+        self.block5 = nn.Sequential(
+            nn.Conv3d(64, 128, 3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv3d(128, 128, 3, stride=1, padding=1),
+            nn.BatchNorm3d(128),
+            nn.ReLU(),
+            nn.MaxPool3d(2, stride=2)
+        )
+
+        self.classifier = nn.Linear(1536, 1)
+
+
+    def forward(self, x):
+        x = self.block1(x)
+        # print(x.shape)
+        x = self.block2(x)
+        # print(x.shape)
+        x = self.block3(x)
+        # print(x.shape)
+        x = self.block4(x)
+        # print(x.shape)
+        x = self.block5(x)
+        # print(x.shape)
+        x = self.classifier(x.view(-1, x.shape[1]*x.shape[2]*x.shape[3]*x.shape[4]))
+        # print(x.shape)
+
+        return x

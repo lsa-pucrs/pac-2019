@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import medicaltorch.transforms as mt_transforms
 import torchvision as tv
 import torchvision.utils as vutils
+import transforms as tf
 
 
 class PAC2019(Dataset):
@@ -186,3 +187,66 @@ class PAC20192D(Dataset):
 
     def __len__(self):
         return len(self.slices)
+
+class PAC20193D(Dataset):
+    def __init__(self, ctx, set, split=0.8):
+        self.ctx = ctx
+        dataset_path = ctx["dataset_path"]
+        csv_path = os.path.join(dataset_path, "PAC2019_BrainAge_Training.csv")
+        dataset = []
+        stratified_dataset = []
+
+        with open(csv_path) as fid:
+            for i, line in enumerate(fid):
+                if i == 0:
+                    continue
+                line = line.split(',')
+                dataset.append({
+                    'subject': line[0],
+                    'age': float(line[1]),
+                    'gender': line[2],
+                    'site': int(line[3].replace('\n',''))
+                })
+
+        sites = defaultdict(list)
+        for data in dataset:
+            sites[data['site']].append(data)
+
+        for site in sites.keys():
+            length = len(sites[site])
+            if set == 'train':
+                stratified_dataset += sites[site][0:int(length*split)]
+            if set == 'val':
+                stratified_dataset += sites[site][int(length*split):]
+
+        self.dataset = stratified_dataset
+
+        self.transform = tv.transforms.Compose([
+            tf.ImgAugTranslation(10),
+            tf.ImgAugRotation(40),
+            tf.ToTensor(),
+        ])
+
+
+    def __getitem__(self, idx):
+        data = self.dataset[idx]
+        filename = os.path.join(self.ctx["dataset_path"], 'gm', data['subject'] + '_gm.nii.gz')
+        input_image = torch.FloatTensor(nib.load(filename).get_fdata())
+        input_image = input_image.permute(2, 1, 0)
+
+        transformed = {
+            'input': input_image
+        }
+
+        transformed = self.transform(transformed['input'])
+        transformed = transformed.unsqueeze(0)
+        # print(transformed.shape)
+
+
+        return {
+            'input': transformed,
+            'label': data['age']
+        }
+
+    def __len__(self):
+        return len(self.dataset)

@@ -1,7 +1,7 @@
 import json
 
-from dataset import PAC2019, PAC20192D
-from model import Model, VGGBasedModel, VGGBasedModel2D
+from dataset import PAC2019, PAC20192D, PAC20193D
+from model import Model, VGGBasedModel, VGGBasedModel2D, ColeModel
 from model_resnet import ResNet, resnet18
 
 import torch
@@ -25,34 +25,40 @@ import numpy as np
 #         return float(np.exp(-5.0 * phase * phase))
 
 
-with open("config.json") as fid:
+with open("config_cole.json") as fid:
     ctx = json.load(fid)
 
 # train_set = PAC2019(ctx, set='train')
 # val_set = PAC2019(ctx, set='val')
-train_set = PAC20192D(ctx, set='train', split=0.8)
-val_set = PAC20192D(ctx, set='val', split=0.8)
+train_set = PAC20193D(ctx, set='train', split=0.8)
+val_set = PAC20193D(ctx, set='val', split=0.8)
 
 train_loader = DataLoader(train_set, shuffle=True, drop_last=True,
                              num_workers=8, batch_size=ctx["batch_size"])
 val_loader = DataLoader(val_set, shuffle=False, drop_last=False,
                              num_workers=8, batch_size=ctx["batch_size"])
 
-mse_loss = nn.MSELoss()
+# mse_loss = nn.MSELoss()
+mae_loss = nn.L1Loss()
 # model = Model()
 # model = VGGBasedModel()
 # model = VGGBasedModel2D()
-model = resnet18()
+# model = resnet18()
+model = ColeModel()
 model.cuda()
 
-optimizer = torch.optim.Adam(model.parameters(), lr=ctx["learning_rate"],
-                             weight_decay=ctx["weight_decay"])
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3,5,10], gamma=0.1)
+# optimizer = torch.optim.Adam(model.parameters(), lr=ctx["learning_rate"],
+                             # weight_decay=ctx["weight_decay"])
+# scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[3,5,10], gamma=0.1)
+optimizer = torch.optim.SGD(model.parameters(), lr=ctx["learning_rate"],
+                             momentum=0.9, weight_decay=ctx["weight_decay"])
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.03)
 best = np.inf
 for e in range(ctx["epochs"]):
     scheduler.step()
     model.train()
     last_50 = []
+    print('Epoch:', e, 'LR:', scheduler.get_lr())
     for i, data in enumerate(train_loader):
         # print(data["input"].shape)
         input_image = Variable(data["input"], requires_grad=True).float().cuda()
@@ -61,7 +67,7 @@ for e in range(ctx["epochs"]):
         # print(output)
         # print(label)
 
-        loss = mse_loss(output.squeeze(), label)
+        loss = mae_loss(output.squeeze(), label)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -73,24 +79,24 @@ for e in range(ctx["epochs"]):
 
     print('Validation...')
     model.eval()
-    val_mse_loss = []
+    # val_mse_loss = []
     val_mae_loss = []
     for i, data in enumerate(val_loader):
         input_image = Variable(data["input"]).float().cuda()
         output = model(input_image)
         label = Variable(data["label"].float()).cuda()
 
-        loss = mse_loss(output.squeeze(), label)
-        val_mse_loss.append(loss.data)
-
-        loss = torch.mean(torch.abs(output.squeeze() - label))
+        loss = mae_loss(output.squeeze(), label)
         val_mae_loss.append(loss.data)
+
+        # loss = torch.mean(torch.abs(output.squeeze() - label))
+        # val_mae_loss.append(loss.data)
 
     if torch.mean(torch.stack(val_mae_loss)) < best:
         best = torch.mean(torch.stack(val_mae_loss))
         print('model saved')
         torch.save(model.state_dict(), 'models/best_model.pt')
 
-    print('Validation Loss (MSE): ', torch.mean(torch.stack(val_mse_loss)))
+    # print('Validation Loss (MSE): ', torch.mean(torch.stack(val_mse_loss)))
     print('Validation Loss (MAE): ', torch.mean(torch.stack(val_mae_loss)))
 
