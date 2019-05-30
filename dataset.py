@@ -13,6 +13,28 @@ import torchvision as tv
 import torchvision.utils as vutils
 import transforms as tf
 
+from tqdm import *
+
+def linked_augmentation(gm_batch, wm_batch, transform):
+
+    gm_batch_size = gm_batch.size(0)
+
+    gm_batch_cpu = gm_batch.cpu().detach()
+    gm_batch_cpu = gm_batch_cpu.numpy()
+
+    wm_batch_cpu = wm_batch.cpu().detach()
+    wm_batch_cpu = wm_batch_cpu.numpy()
+
+    samples_linked_aug = []
+    sample_linked_aug = {'input': [gm_batch_cpu,
+                                   wm_batch_cpu]}
+    # print('GM: ', sample_linked_aug['input'][0].shape)
+    # print('WM: ', sample_linked_aug['input'][1].shape)
+    out = transform(sample_linked_aug)
+    # samples_linked_aug.append(out)
+
+    # samples_linked_aug = mt_datasets.mt_collate(samples_linked_aug)
+    return out
 
 class PAC2019(Dataset):
     def __init__(self, ctx, set, split=0.8):
@@ -63,26 +85,31 @@ class PAC2019(Dataset):
     def __getitem__(self, idx):
         data = self.dataset[idx]
         filename = os.path.join(self.ctx["dataset_path"], 'gm', data['subject'] + '_gm.nii.gz')
-        input_image = torch.FloatTensor(nib.load(filename).get_fdata())
-        input_image = input_image.permute(2, 0, 1)
+        gm_image = torch.FloatTensor(nib.load(filename).get_fdata())
+        gm_image = gm_image.permute(2, 0, 1)
+
+        filename = os.path.join(self.ctx["dataset_path"], 'wm', data['subject'] + '_wm.nii.gz')
+        wm_image = torch.FloatTensor(nib.load(filename).get_fdata())
+        wm_image = wm_image.permute(2, 0, 1)
 
         # transformed = {
-        #     'input': input_image
+        #     'input': gm_image
         # }
         # self.transform(transformed)
 
-        # plt.imshow(input_image[60,:,:])
+        # plt.imshow(gm_image[60,:,:])
         # plt.show()
-        # plt.imshow(input_image[:,60,:])
+        # plt.imshow(gm_image[:,60,:])
         # plt.show()
-        # plt.imshow(input_image[:,:,60])
+        # plt.imshow(gm_image[:,:,60])
         # plt.show()
         #
         # raise
 
 
         return {
-            'input': input_image,
+            'gm': gm_image,
+            'wm': wm_image,
             'label': data['age']
         }
 
@@ -148,40 +175,67 @@ class PAC20192D(Dataset):
 
 
     def preprocess_dataset(self):
-        for i, data in enumerate(self.dataset):
-            if i % 50 == 0:
-                print('Loading %d/%d' % (i, len(self.dataset)))
-            filename = os.path.join(self.ctx["dataset_path"], 'gm', data['subject'] + '_gm.nii.gz')
-            input_image = torch.FloatTensor(nib.load(filename).get_fdata())
-            input_image = input_image.permute(2, 0, 1)
+        for i, data in enumerate(tqdm(self.dataset, desc="Loading dataset")):
+            filename_gm = os.path.join(self.ctx["dataset_path"], 'gm', data['subject'] + '_gm.nii.gz')
+            input_image_gm = torch.FloatTensor(nib.load(filename_gm).get_fdata())
+            input_image_gm = input_image_gm.permute(2, 0, 1)
 
-            start = int((1.-self.portion)*input_image.shape[0])
-            end = int(self.portion*input_image.shape[0])
-            input_image = input_image[start:end,:,:]
-            for slice_idx in range(input_image.shape[0]):
-                slice = input_image[slice_idx,:,:]
-                slice = slice.unsqueeze(0)
+            filename_wm = os.path.join(self.ctx["dataset_path"], 'wm', data['subject'] + '_wm.nii.gz')
+            input_image_wm = torch.FloatTensor(nib.load(filename_wm).get_fdata())
+            input_image_wm = input_image_wm.permute(2, 0, 1)
+
+            start = int((1.-self.portion)*input_image_gm.shape[0])
+            end = int(self.portion*input_image_gm.shape[0])
+            input_image_gm = input_image_gm[start:end,:,:]
+            input_image_wm = input_image_wm[start:end,:,:]
+            for slice_idx in range(input_image_gm.shape[0]):
+                slice_gm = input_image_gm[slice_idx,:,:]
+                slice_wm = input_image_wm[slice_idx,:,:]
+
+                slice_gm = slice_gm.unsqueeze(0)
+                slice_wm = slice_wm.unsqueeze(0)
+
+                slice = torch.cat([slice_gm, slice_wm], dim=0)
+
+                # print(slice.max(), slice.min())
                 self.slices.append({
                     'image': slice,
                     'age': data['age']
                 })
+                # plt.imshow(slice.squeeze())
+                # plt.show()
 
+
+
+
+            # raise
 
 
     def __getitem__(self, idx):
-        # data = self.dataset[idx]
-        # filename = os.path.join(self.ctx["dataset_path"], 'gm', data['subject'] + '_gm.nii.gz')
-        # input_image = torch.FloatTensor(nib.load(filename).get_fdata())
-        # input_image = input_image.permute(2, 0, 1)
 
         data = self.slices[idx]
-        transformed = {
-            'input': data['image']
-        }
-        transformed = self.transform(transformed)
+        # transformed = {
+        #     'input': data['image']
+        # }
+        # plt.imshow(data['image'][0])
+        # plt.title('gm')
+        # plt.show()
+        # plt.imshow(data['image'][1])
+        # plt.title('wm')
+        # plt.show()
+        gm = data['image'][0].unsqueeze(0)
+        wm = data['image'][1].unsqueeze(0)
+
+        batch = linked_augmentation(gm, wm, self.transform)
+        # print('gm: ', batch['input'][0].shape)
+        # print('wm: ', batch['input'][1].shape)
+        batch = torch.cat([batch['input'][0], batch['input'][1]], dim=0)
+        # print('Final shape: ', batch.shape)
+
+        # transformed = self.transform(transformed)
 
         return {
-            'input': transformed['input'],
+            'input': batch,
             'label': data['age']
         }
 
@@ -232,7 +286,7 @@ class PAC20193D(Dataset):
         data = self.dataset[idx]
         filename = os.path.join(self.ctx["dataset_path"], 'gm', data['subject'] + '_gm.nii.gz')
         input_image = torch.FloatTensor(nib.load(filename).get_fdata())
-        input_image = input_image.permute(2, 1, 0)
+        input_image = input_image.permute(2, 0, 1)
 
         transformed = {
             'input': input_image
